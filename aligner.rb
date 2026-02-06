@@ -153,7 +153,7 @@ class SquareItem < Item
 end
 
 class ProductMatcher
-  SIMILARITY_THRESHOLD = 0.42
+  SIMILARITY_THRESHOLD = 0.39999
 
   def initialize(shopify_file, square_file, output_file)
     @shopify_file = shopify_file
@@ -204,19 +204,22 @@ class ProductMatcher
     word_similarity = total_words > 0 ? (common_words.size.to_f / total_words) : 0.0
 
     order_match_count = 0
-    words1.each_with_index do |word,idx|
-      word2 = words2[idx]
-      break if word2.nil?
-      break if word != word2
+
+    common_words1 = words1 & common_words
+    common_words2 = words2 & common_words
+    common_words1.each_with_index do |word,idx|
+      common_word2 = common_words2[idx]
+      break if common_word2.nil?
+      break if word != common_word2
       order_match_count += 1
     end
 
-    order_similarity = order_match_count.to_f / words1.size
+    order_similarity = order_match_count.to_f / (words1 + words2).uniq.size
 
-    similarity = 0.3 * word_similarity + 0.7 * order_similarity
-    puts "words1: #{words1}"
-    puts "words2: #{words2}"
-    puts "Similarity #{word_similarity} #{order_similarity} #{similarity}"
+    similarity = 0.6 * word_similarity + 0.4 * order_similarity
+    # puts "words1: #{words1}"
+    # puts "words2: #{words2}"
+    # puts "Similarity #{word_similarity} #{order_similarity} #{similarity}"
     return similarity
   end
 
@@ -387,6 +390,10 @@ class ProductMatcher
         # Found matches
         if matches.size > 1
           duplicate_count += 1
+        end
+        puts "Matches:"
+        matches.sort_by { |match| -match[:score] }.first(4).each do |match|
+          puts "  #{match[:score]}\t#{match[:row]['Title']} <> #{square_row['Item Name']}"
         end
         match = matches.max_by{ |match| match[:score] }
 
