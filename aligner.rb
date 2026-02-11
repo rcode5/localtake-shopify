@@ -6,7 +6,7 @@ require 'active_model'
 #require './vendor_map.rb'
 require 'debug'
 
-
+DEBUG = 0
 SQUARE_VENDOR_TO_SHOPIFY_VENDOR_LOOKUP = {
   "Amy Rose WS" => "Amy Rose Moore",
   "Bad Attitude Bunny Illustration" => "Bad Attitude Bunny",
@@ -25,8 +25,11 @@ SQUARE_VENDOR_TO_SHOPIFY_VENDOR_LOOKUP = {
   "Local Take, Trays4Us WS" => "Trays4Us",
   "Mojo Bakes SF" => "Mojo Bakes",
   "Noteify WS" => "Noteify",
+  "Local Notion" => "San Francycle",
+  "Pretty Alright Goods" => "The Matt Butler",
   "Ork Inc" => "Ork",
   "SF Mercantile - LT" => "SF Mercantile",
+  "Space46" => "Space 49",
   "Steamer Lane Design" => "Steamer Lane",
   "Sundrop Jewelry" => "Sundrop",
   'Tickle & Smash' => 'Tickle and Smash',
@@ -93,11 +96,32 @@ class Item
   def normalize_title(str)
     normalize_string(str)
       .tr("-", ' ')
+      .gsub(%r{\bl\b}, 'large')
+      .gsub(%r{\blg\b}, 'large')
+      .gsub(%r{\bm\b}, 'medium')
+      .gsub(%r{\bmd\b}, 'medium')
+      .gsub(%r{\bs\b}, 'small')
+      .gsub(%r{\bsm\b}, 'small')
+      .gsub(%r{\b8x10\b}, '8x10 print')
+      .gsub(%r{\b11x14\b}, '11x14 print')
+      .gsub(%r{\b11x17\b}, '11x17 print')
+      .gsub(%r{\b16x20\b}, '16x20 print')
+      .gsub(%r{\bkey tag\b}, 'keychain')
       .gsub(%r{\bggb\b}, 'golden gate bridge')
       .gsub(%r{\bsf\b}, 'san francisco')
       .gsub(%r{\bgg\b}, 'golden gate')
-      .gsub(%r{\bwom\b}, 'women')
+      .gsub(%r{\bwom\b}, 'womens')
       .gsub(%r{\bca\b}, 'california')
+      .gsub(%r{\bstud\b}, 'studs')
+      .gsub(%r{\bneck\b}, 'necklace')
+      .gsub(%r{\bghidorrah\b}, 'ghidorah')
+      .gsub(%r{\bblk\b}, 'black')
+      .gsub(%r{\bwht\b}, 'white')
+      .gsub(%r{\bgrn\b}, 'green')
+      .gsub(%r{\bblu\b}, 'blue')
+      .gsub(%r{\bnec\b}, 'necklace')
+      .gsub(%r{\bneck\b}, 'necklace')
+      .gsub(%r{\bwomen\n}, 'womens')
   end
 
   def raw_price
@@ -130,7 +154,7 @@ class ShopifyItem < Item
   end
 
   def raw_title
-    (@row['Title'] + ' ' + @row['Option1 Name'] + ' ' + @row['Option1 Value'])
+    (@row['Title'].to_s + ' ' + @row['Option1 Name'].to_s + ' ' + @row['Option1 Value'].to_s)
       .gsub(%r{default|title|default title}i, '')
       .gsub(vendor.strip.downcase, '')
       .strip
@@ -186,13 +210,15 @@ class ProductMatcher
   end
 
   def fuzzy_title_match?(item1, item2)
-    score =fuzzy_title_score(item1, item2)
+    score = fuzzy_title_score(item1, item2)
+
     return :partial if score >= SIMILARITY_THRESHOLD
   end
 
   def fuzzy_title_score(item1, item2)
     title1 = item1.title
     title2 = item2.title
+    return 0 if title1.empty? || title2.empty?
     # Exact match
     return 1 if title1 == title2
 
@@ -221,9 +247,12 @@ class ProductMatcher
     order_similarity = order_match_count.to_f / (words1 + words2).uniq.size
 
     similarity = 0.6 * word_similarity + 0.4 * order_similarity
-    # puts "words1: #{words1}"
-    # puts "words2: #{words2}"
-    # puts "Similarity #{word_similarity} #{order_similarity} #{similarity}"
+
+    if DEBUG == 1
+      puts "words1: #{words1}"
+      puts "words2: #{words2}"
+      puts "Similarity #{word_similarity} #{order_similarity} #{similarity}"
+    end
     return similarity
   end
 
@@ -263,22 +292,19 @@ class ProductMatcher
     end
 
     # If vendors don't match, confidence is low
-    unless vendor_matches
-      return 'Low'
-    end
+    return 'No vendor match' unless vendor_matches
 
     # Medium confidence: vendor matches, title is fuzzy (word order or partial)
-    if vendor_matches && (title_match_type == :word_order || title_match_type == :partial)
-      return 'Medium'
+    if title_match_type == :word_order || title_match_type == :partial
+      return "medium title match#{price_matches ? "" : " prices don\'t match"}"
     end
 
     # High confidence: vendor matches, title exact or very close, price matches
-    if vendor_matches && (title_match_type == :exact || title_match_type == :word_order) && price_matches
-      return 'High'
+    if (title_match_type == :exact || title_match_type == :word_order) && price_matches
+      return 'good title match + price'
     end
 
-    # Default to medium if vendor matches
-    vendor_matches ? 'Medium' : 'Low'
+    'vendor and price match'
   end
 
   def find_matches(square_row)
@@ -300,10 +326,6 @@ class ProductMatcher
         next
       end
 
-      if !price_match?(square_item, shopify_item)
-        next
-      end
-
       if shopify_item.title == square_item.title
         matches << { row: shopify_row, index: idx, match_type: :exact, score: 1 }
         next
@@ -311,7 +333,6 @@ class ProductMatcher
 
       # Fuzzy match - vendor must match, category should match, title can be fuzzy
       if vendor_match?(square_item, shopify_item) &&
-        price_match?(square_item, shopify_item)
         score = fuzzy_title_score(square_item, shopify_item)
         matches << { row: shopify_row, index: idx, match_type: :fuzzy , score:}
       end
@@ -348,7 +369,7 @@ class ProductMatcher
   end
 
   def load_data
-    puts "Loading Shopify data..."
+    puts "Loading Shopify data from #{@shopify_file}..."
     @shopify_headers = nil
     CSV.foreach(@shopify_file, headers: true, encoding: 'UTF-8') do |row|
       @shopify_headers = row.headers if @shopify_headers.nil?
@@ -356,7 +377,7 @@ class ProductMatcher
     end
     puts "Loaded #{@shopify_rows.size} Shopify rows"
 
-    puts "Loading Square data..."
+    puts "Loading Square data from #{@square_file}..."
     @square_headers = nil
     CSV.foreach(@square_file, headers: true, encoding: 'UTF-8') do |row|
       @square_headers = row.headers if @square_headers.nil?
@@ -378,7 +399,6 @@ class ProductMatcher
     puts "\nProcessing Square rows..."
 
     @square_rows.each_with_index do |square_row, square_idx|
-      puts "#{square_idx} EMPTY TITLE" if square_row['Item Name'].to_s.strip.empty?
       matches = find_matches(square_row)
 
       if matches.empty?
@@ -388,15 +408,16 @@ class ProductMatcher
         @shopify_headers.each do |header|
           new_row[header] = new_row[header] || ''
         end
+
         new_row['Match Confidence'] = 'No Match'
         new_row['Match Notes'] = 'New row created from Square data'
         new_row['Square Title'] = square_row['Item Name']
         output_rows << new_row
 
         handle = new_row['Handle']
-        if handles.include? handle
-          puts "Found matching handle when adding new row #{handle}"
-        end
+        # if handles.include? handle
+        #   puts "Found matching handle when adding new row #{handle}"
+        # end
         handles.add handle
         unmatched_count += 1
       else
@@ -405,10 +426,14 @@ class ProductMatcher
           duplicate_count += 1
         end
 
-        # puts "Matches:"
-        # matches.sort_by { |match| -match[:score] }.first(4).each do |match|
-        #   puts "  #{match[:score]}\t#{match[:row]['Title']} <> #{square_row['Item Name']}"
-        # end
+        if DEBUG == 1
+          next if matches.none? {|m| m[:score] > 0.1 }
+          puts "Matches:"
+          matches.sort_by { |match| -match[:score] }.first(4).each do |match|
+            puts "  #{match[:score]}\t#{match[:row]['Title']} <> #{square_row['Item Name']}"
+          end
+        end
+
         match = matches.max_by{ |match| match[:score] }
 
         shopify_row = match[:row].dup
@@ -435,7 +460,7 @@ class ProductMatcher
 
         handle = shopify_row['Handle']
         if handles.include? handle
-          puts "Found matching handle with existing row #{handle}"
+          # puts "Found matching handle with existing row #{handle}"
           manual_intervention_rows << shopify_row
         else
           handles.add handle
@@ -511,13 +536,20 @@ class ProductMatcher
         30
       when 'variant barcode'
         31
+      when 'match notes'
+        40
+      when 'match confidence'
+        42
       else
         100
       end
     end
     CSV.open(file, 'w', write_headers: true, headers: all_headers, encoding: 'UTF-8') do |csv|
       rows.each do |row|
-        puts "EMPTY TITLE: #{row.values.join(",")}" if row['Title'].to_s.strip.empty?
+        if row['Title'].to_s.strip.empty?
+#          puts "EMPTY TITLE: #{row.values.join(",")}"
+          next
+        end
         csv << all_headers.map { |h| row[h] || '' }
       end
     end
@@ -531,14 +563,19 @@ if __FILE__ == $0
   vendor = "Tickle and Smash"
   vendor = "Animal Instincts"
   vendor = "Doodles Ink"
+  vendor = "3 Fish"
 
-  shopify_file = 'Shopify product list_' + vendor + '.csv'
-  square_file = 'Square product export 1_' + vendor + '.csv'
+  shopify_file = 'shopify_product_export_' + vendor + '.csv'
+  square_file = 'square_product_list_' + vendor + '.csv'
   output_file = 'Merged product list_' + vendor + '.csv'
 
   square_file = "square_product_list.20260207.csv"
   shopify_file = "shopify_product_export.20260207.csv"
-  output_file = "merged_shopify.20260207.csv"
+  output_file = "merged_shopify.20260207-5.csv"
+
+  # square_file = "square-sample.csv"
+  # shopify_file = "shopify-sample.csv"
+  # output_file = "merged_sampler.csv"
 
   # shopify_file = 'Shopify product list.csv'
   # square_file = 'Square product export 1.31.26.csv'
