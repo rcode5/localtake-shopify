@@ -7,14 +7,12 @@ class NoMatches < StandardError; end
 # Read the Shopify CSV file
 csv_filename = $ARGV[0]
 vendor_name = $ARGV[1]
-new_file_name =csv_filename.split('.')[0] + '_' + vendor_name.split('.')[0] + '.csv'
+new_file_name = csv_filename.split('.')[0] + '_' + vendor_name.split('.')[0] + '.csv'
 rows = CSV.read(csv_filename, headers: true)
 vendor_rows = []
 vendor_name_matcher = vendor_name.to_s.strip.downcase
 rows.each do |row|
-  if row.to_s.strip.downcase.include? vendor_name_matcher
-    vendor_rows << row.to_h
-  end
+  vendor_rows << row.to_h if row.to_s.strip.downcase.include? vendor_name_matcher
 end
 raise NoMatches, "Found no matches for #{vendor_name}" unless vendor_rows.count > 0
 
@@ -25,5 +23,3 @@ CSV.open(new_file_name, 'w', headers: true) do |csv|
     csv << row
   end
 end
-
-
