@@ -29,7 +29,10 @@ SQUARE_VENDOR_TO_SHOPIFY_VENDOR_LOOKUP = {
   'Noteify WS' => 'Noteify',
   'Ork Inc' => 'Ork',
   'Pretty Alright Goods' => 'The Matt Butler',
+  'Rover & Kin' => 'Rover + Kin',
   'SF Mercantile - LT' => 'SF Mercantile',
+  'Shawn R Harris' => 'Shawn Ray Harris',
+  'Sincerely\, Rob' => 'Sincerely, Rob',
   'Space46' => 'Space 49',
   'Steamer Lane Design' => 'Steamer Lane',
   'Sundrop Jewelry' => 'Sundrop',
@@ -108,6 +111,8 @@ class Item
       .gsub(/\bmd\b/, 'medium')
       .gsub(/\bs\b/, 'small')
       .gsub(/\bsm\b/, 'small')
+      .gsub(/\bxl\b/, 'extra-large')
+      .gsub(/\bls\b/, 'long sleeve')
       .gsub(/\b5x7\b/, '5x7 print')
       .gsub(/\b8x10\b/, '8x10 print')
       .gsub(/\b11x14\b/, '11x14 print')
@@ -118,6 +123,8 @@ class Item
       .gsub(/\bsf\b/, 'san francisco')
       .gsub(/\bgg\b/, 'golden gate')
       .gsub(/\bwom\b/, 'womens')
+      .gsub(/\bwomen's\b/, 'womens')
+      .gsub(/\bmen's\b/, 'mens')
       .gsub(/\bca\b/, 'california')
       .gsub(/\bcali\b/, 'california')
       .gsub(/\bstud\b/, 'studs')
@@ -132,6 +139,7 @@ class Item
       .gsub(/\bwomen\b/, 'womens')
       .gsub(/\b12x12\b/, 'art print')
       .gsub(/\bdopp\b/,  'box zip')
+      .gsub(/\brbg\b/, 'ruth bader ginsberg')
   end
 
   def raw_price
@@ -442,7 +450,7 @@ class ProductMatcher
           end
         end
 
-        match = matches.max_by { |match| match[:score] }
+        match = matches.sort_by { |match| [-1*match[:score], match[:row]['Title']] }.first
 
         shopify_row = match[:row].dup
         confidence = calculate_confidence(shopify_row, square_row, match[:match_type])
@@ -551,7 +559,7 @@ class ProductMatcher
       end
     end
     CSV.open(file, 'w', write_headers: true, headers: all_headers, encoding: 'UTF-8') do |csv|
-      rows.each do |row|
+      rows.sort_by{|r| r['Vendor'] || ''}.each do |row|
         if row['Title'].to_s.strip.empty?
           #          puts "EMPTY TITLE: #{row.values.join(",")}"
           next
@@ -565,9 +573,9 @@ end
 
 # Main execution
 
-square_file = 'square_product_list.20260207.csv'
-shopify_file = 'shopify_product_export.20260207.csv'
-output_file = 'merged_shopify.20260207-6.csv'
+square_file = 'Square 2.13.26.csv'
+shopify_file = 'Shopify 2.13.26x.csv'
+output_file = 'merged_shopify.20260213.csv'
 
 # square_file = "square-sample.csv"
 # shopify_file = "shopify-sample.csv"

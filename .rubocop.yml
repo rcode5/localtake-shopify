@@ -1,0 +1,187 @@
+AllCops:
+  # Only runs checks on specific directories. Could be expanded to
+  # include more directories.
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  SuggestExtensions: false
+
+  Exclude:
+    - .spec
+    - Capfile
+    - Gemfile
+    - Guardfile
+    - Rakefile
+    - bin/**/*
+    - '**/*.sh'
+    - '**/*.bash'
+    - '**/*.yml'
+    - '**/*.txt'
+    - '**/*.md'
+    - 'bin/**'
+    - node_modules/**/*
+    - config/boot.rb
+    - db/schema.rb
+    - db/migrate/**/*
+    - spec/*.opts
+    - tmp/**/*
+    - vendor/**/*
+    - log/**/*
+    - lib/tasks/mau.rake
+    - lib/tasks/debug.rake
+    - local_gems/**/*
+    - app/lib/app_config.rb
+    - config/environment.rb
+    - config/initializers/filter_parameter_logging.rb
+    - config/initializers/new_framework_defaults_7_0.rb
+    - config/environments/development.rb
+    - config/environments/test.rb
+    - config/environments/production.rb
+    - config/initializers/setup_email_lists.rb
+    - features/step_definitions/factory_steps.rb
+    - features/step_definitions/shared_steps.rb
+    - features/step_definitions/user_steps.rb
+
+Layout/EmptyLinesAroundAttributeAccessor:
+  Enabled: true
+
+Layout/FirstArrayElementLineBreak:
+  Enabled: true
+
+Layout/FirstHashElementLineBreak:
+  Enabled: true
+
+# Layout/FirstMethodArgumentLineBreak:
+#   Enabled: true
+
+Layout/MultilineArrayLineBreaks:
+  Enabled: true
+
+Layout/MultilineHashKeyLineBreaks:
+  Enabled: true
+
+Layout/MultilineMethodArgumentLineBreaks:
+  Enabled: true
+
+Layout/SpaceAroundMethodCallOperator:
+  Enabled: true
+
+Lint/DeprecatedOpenSSLConstant:
+  Enabled: true
+
+Lint/EmptyBlock:
+  Enabled: false
+
+Lint/RaiseException:
+  Enabled: true
+
+Lint/StructNewOverride:
+  Enabled: true
+
+Lint/SuppressedException:
+  Exclude:
+    - lib/tasks/*.rake
+    - app/services/search/elasticsearch/search_service.rb
+
+Metrics/AbcSize:
+  Max: 38
+
+Metrics/BlockLength:
+  Max: 151
+  Exclude:
+    - config/routes.rb
+
+Metrics/ClassLength:
+  Max: 300
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Layout/LineLength:
+  Max: 150
+
+Metrics/MethodLength:
+  Max: 50
+
+Metrics/PerceivedComplexity:
+  Max: 9
+
+Naming/AccessorMethodName:
+  Exclude:
+    - app/models/concerns/address_mixin.rb
+
+Naming/ConstantName:
+  Exclude:
+    - config/application.rb
+    - app/presenters/open_studios_participant_presenter.rb
+
+Naming/MemoizedInstanceVariableName:
+  EnforcedStyleForLeadingUnderscores: optional
+  Exclude:
+    - app/controllers/**/*.rb
+    - spec/support/**/*.rb
+
+Naming/PredicateMethod:
+  Exclude:
+    - app/models/independent_studio.rb
+
+Naming/PredicatePrefix:
+  Exclude:
+    - config/application.rb
+    - app/presenters/open_studios_participant_presenter.rb
+    - spec/support/mail_matchers.rb
+
+Style/Documentation:
+  Enabled: false
+
+Style/DoubleNegation:
+  Enabled: false
+
+Style/ExponentialNotation:
+  Enabled: true
+
+Style/FormatStringToken:
+  Enabled: false
+
+Style/FormatString:
+  EnforcedStyle: sprintf
+  SupportedStyles:
+    - sprintf
+    - format
+
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: never
+
+Style/HashEachMethods:
+  Enabled: true
+
+Style/HashTransformKeys:
+  Enabled: true
+
+Style/HashTransformValues:
+  Enabled: true
+
+Style/RegexpLiteral:
+  EnforcedStyle: slashes
+  SupportedStyles:
+    - slashes
+    - percent_r
+  AllowInnerSlashes: false
+
+Style/SlicingWithRange:
+  Enabled: true
+
+Style/StructInheritance:
+  Exclude:
+    - 'app/models/independent_studio.rb'
+
+Style/PerlBackrefs:
+  Enabled: false
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
