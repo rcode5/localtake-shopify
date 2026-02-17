@@ -114,9 +114,13 @@ class Item
       .gsub(/\bxl\b/, 'extra-large')
       .gsub(/\bls\b/, 'long sleeve')
       .gsub(/\b5x7\b/, '5x7 print')
+      .gsub(/\b8x8\b/, '8x8 print')
       .gsub(/\b8x10\b/, '8x10 print')
+      .gsub(/\b8x12\b/, '8x12 print')
+      .gsub(/\b9x12\b/, '9x12 print')
       .gsub(/\b11x14\b/, '11x14 print')
       .gsub(/\b11x17\b/, '11x17 print')
+      .gsub(/\b16x16\b/, '16x16 print')
       .gsub(/\b16x20\b/, '16x20 print')
       .gsub(/\bkey tag\b/, 'keychain')
       .gsub(/\bggb\b/, 'golden gate bridge')
@@ -358,29 +362,34 @@ class ProductMatcher
     matches
   end
 
-  def create_shopify_row_from_square(square_row)
+  def create_shopify_row_from_square(square_row, expected_headers)
     # Create a new row with Square data mapped to Shopify format
     row = {}
 
     # Map key fields
     row['Title'] = square_row['Item Name'] || square_row['Customer-facing Name'] || ''
-    row['Vendor'] = square_row['Categories'] || ''
+    vendor = square_row['Categories'] || ''
+    row['Vendor'] = SQUARE_VENDOR_TO_SHOPIFY_VENDOR_LOOKUP.fetch(vendor, vendor)
     row['Variant SKU'] = square_row['SKU'] || ''
     row['Variant Barcode'] = row['Variant SKU']
     row['Variant Price'] = square_row['Price'] || ''
     row['Body (HTML)'] = square_row['Description'] || ''
-
-    # Generate handle from title
-    handle = normalize_string(row['Title'])
-             .gsub(/[^a-z0-9]+/, '-')
-             .gsub(/^-+|-+$/, '')
-    row['Handle'] = handle + '-square'
-
+    row['Variant Inventory Qty'] = square_row['Current Quantity Castro'] || ''
     # Set defaults
     row['Published'] = 'TRUE'
     row['Variant Requires Shipping'] = 'TRUE'
     row['Variant Taxable'] = 'TRUE'
     row['Status'] = 'active'
+
+    # Fill in all Shopify columns
+    @shopify_headers.each do |header|
+      row[header] = row[header] || ''
+    end
+
+    row['Match Confidence'] = 'No Match'
+    row['Match Notes'] = 'New row created from Square data'
+    row['Square Title'] = square_row['Item Name']
+    row["Square Token"] = square_row['Token']
 
     row
   end
@@ -390,7 +399,7 @@ class ProductMatcher
     @shopify_headers = nil
     CSV.foreach(@shopify_file, headers: true, encoding: 'UTF-8') do |row|
       @shopify_headers = row.headers if @shopify_headers.nil?
-      @shopify_rows << row.to_h
+      @shopify_rows << row.to_h if row['Title'].present?
     end
     puts "Loaded #{@shopify_rows.size} Shopify rows"
 
@@ -398,7 +407,7 @@ class ProductMatcher
     @square_headers = nil
     CSV.foreach(@square_file, headers: true, encoding: 'UTF-8') do |row|
       @square_headers = row.headers if @square_headers.nil?
-      @square_rows << row.to_h
+      @square_rows << row.to_h if row['Item Name'].present?
     end
     puts "Loaded #{@square_rows.size} Square rows"
   end
@@ -420,18 +429,11 @@ class ProductMatcher
 
       if matches.empty?
         # No match found - create new row
-        new_row = create_shopify_row_from_square(square_row)
-        # Fill in all Shopify columns
-        @shopify_headers.each do |header|
-          new_row[header] = new_row[header] || ''
-        end
+        new_row = create_shopify_row_from_square(square_row, @shopify_headers)
 
-        new_row['Match Confidence'] = 'No Match'
-        new_row['Match Notes'] = 'New row created from Square data'
-        new_row['Square Title'] = square_row['Item Name']
         output_rows << new_row
 
-        handle = new_row['Handle']
+        handle = new_row['Token']
         # if handles.include? handle
         #   puts "Found matching handle when adding new row #{handle}"
         # end
@@ -459,10 +461,10 @@ class ProductMatcher
         # Add Square SKU to Variant SKU (append if already exists)
         if shopify_row['Variant SKU'].to_s.strip.empty?
           shopify_row['Variant SKU'] = square_row['SKU'] || ''
-        else
-          existing_sku = shopify_row['Variant SKU']
-          new_sku = square_row['SKU'] || ''
-          shopify_row['Variant SKU'] = "#{existing_sku}, #{new_sku}".strip
+        # else
+        #   existing_sku = shopify_row['Variant SKU']
+        #   new_sku = square_row['SKU'] || ''
+        #   shopify_row['Variant SKU'] = "#{existing_sku}, #{new_sku}".strip
         end
         shopify_row['Variant Barcode'] = shopify_row['Variant SKU']
 
@@ -490,7 +492,7 @@ class ProductMatcher
       puts "  Processed #{square_idx + 1}/#{@square_rows.size} Square rows..." if (square_idx + 1) % 100 == 0
     end
 
-    # Add unmatched Shopify rows (rows that weren't matched to any Square item)
+    #  Add unmatched Shopify rows (rows that weren't matched to any Square item)
     puts "\nAdding unmatched Shopify rows..."
     shopify_matched_indices = Set.new
     output_rows.each do |row|
@@ -505,14 +507,28 @@ class ProductMatcher
       end
     end
 
+    unmatched_square_rows = @square_rows.map.with_index do |row, idx|
+      next if @matched_square_indices.include?(idx)
+      row
+    end.compact
+
+    puts "Creating #{unmatched_square_rows.count} rows directly from square..."
+    unmatched_square_rows.each do |row|
+      new_row = create_shopify_row_from_square(row, @shopify_headers)
+      output_rows << new_row
+    end
+
+    puts "Adding shopify no match #{@shopify_rows.count}..."
     @shopify_rows.each_with_index do |shopify_row, idx|
-      next if shopify_matched_indices.include?(idx)
+      next if shopify_matched_indices.include? idx
 
       new_row = shopify_row.dup
       new_row['Match Confidence'] = 'No Match'
       new_row['Match Notes'] = 'Shopify row with no Square match'
       output_rows << new_row
     end
+
+    output_rows = output_rows.uniq { |row| row['Variant SKU'] }
 
     puts "\nWriting output..."
     write_output(output_rows, @output_file)
@@ -531,9 +547,9 @@ class ProductMatcher
   def write_output(rows, file)
     # Get all headers including new ones
     all_headers = @shopify_headers.dup
-    all_headers << 'Match Confidence' unless all_headers.include?('Match Confidence')
-    all_headers << 'Match Notes' unless all_headers.include?('Match Notes')
-    all_headers << 'Square Title' unless all_headers.include?('Square Title')
+
+    extra_headers = ['Match Confidence' , 'Match Notes', 'Square Title', 'Square Token']
+    all_headers = (all_headers + extra_headers).uniq
     all_headers.sort_by! do |h|
       case h.downcase
       when 'handle'
@@ -559,12 +575,7 @@ class ProductMatcher
       end
     end
     CSV.open(file, 'w', write_headers: true, headers: all_headers, encoding: 'UTF-8') do |csv|
-      rows.sort_by{|r| r['Vendor'] || ''}.each do |row|
-        if row['Title'].to_s.strip.empty?
-          #          puts "EMPTY TITLE: #{row.values.join(",")}"
-          next
-        end
-
+      rows.sort_by{|r| [r['Vendor'].to_s, r['Title'].to_s] }.each do |row|
         csv << all_headers.map { |h| row[h] || '' }
       end
     end
@@ -573,9 +584,13 @@ end
 
 # Main execution
 
-square_file = 'Square 2.13.26.csv'
-shopify_file = 'Shopify 2.13.26x.csv'
-output_file = 'merged_shopify.20260213.csv'
+square_file = 'Square 2.17.26.csv'
+shopify_file = 'Shopify 2.17.26x.csv'
+output_file = 'merged_shopify.20260217.csv'
+
+# square_file = 'Square 2_Charlie Wylie.csv'
+# shopify_file = 'Shopify 2_Charlie Wylie.csv'
+# output_file = 'merged_Charlie Wylie.csv'
 
 # square_file = "square-sample.csv"
 # shopify_file = "shopify-sample.csv"
