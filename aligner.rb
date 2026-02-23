@@ -389,7 +389,7 @@ class ProductMatcher
     row['Match Confidence'] = 'No Match'
     row['Match Notes'] = 'New row created from Square data'
     row['Square Title'] = square_row['Item Name']
-    row["Square Token"] = square_row['Token']
+    row['Square Token'] = square_row['Token']
 
     row
   end
@@ -452,7 +452,7 @@ class ProductMatcher
           end
         end
 
-        match = matches.sort_by { |match| [-1*match[:score], match[:row]['Title']] }.first
+        match = matches.sort_by { |match| [-1 * match[:score], match[:row]['Title']] }.first
 
         shopify_row = match[:row].dup
         confidence = calculate_confidence(shopify_row, square_row, match[:match_type])
@@ -461,12 +461,13 @@ class ProductMatcher
         # Add Square SKU to Variant SKU (append if already exists)
         if shopify_row['Variant SKU'].to_s.strip.empty?
           shopify_row['Variant SKU'] = square_row['SKU'] || ''
-        # else
-        #   existing_sku = shopify_row['Variant SKU']
-        #   new_sku = square_row['SKU'] || ''
-        #   shopify_row['Variant SKU'] = "#{existing_sku}, #{new_sku}".strip
+          # else
+          #   existing_sku = shopify_row['Variant SKU']
+          #   new_sku = square_row['SKU'] || ''
+          #   shopify_row['Variant SKU'] = "#{existing_sku}, #{new_sku}".strip
         end
         shopify_row['Variant Barcode'] = shopify_row['Variant SKU']
+        shopify_row['Variant Inventory Qty'] = square_row['Current Quantity Castro'] || ''
 
         shopify_row['Match Confidence'] = confidence
         shopify_row['Match Notes'] = if matches.size > 1
@@ -509,6 +510,7 @@ class ProductMatcher
 
     unmatched_square_rows = @square_rows.map.with_index do |row, idx|
       next if @matched_square_indices.include?(idx)
+
       row
     end.compact
 
@@ -548,7 +550,7 @@ class ProductMatcher
     # Get all headers including new ones
     all_headers = @shopify_headers.dup
 
-    extra_headers = ['Match Confidence' , 'Match Notes', 'Square Title', 'Square Token']
+    extra_headers = ['Match Confidence', 'Match Notes', 'Square Title', 'Square Token']
     all_headers = (all_headers + extra_headers).uniq
     all_headers.sort_by! do |h|
       case h.downcase
@@ -575,7 +577,7 @@ class ProductMatcher
       end
     end
     CSV.open(file, 'w', write_headers: true, headers: all_headers, encoding: 'UTF-8') do |csv|
-      rows.sort_by{|r| [r['Vendor'].to_s, r['Title'].to_s] }.each do |row|
+      rows.sort_by { |r| [r['Vendor'].to_s, r['Title'].to_s] }.each do |row|
         csv << all_headers.map { |h| row[h] || '' }
       end
     end
@@ -584,9 +586,9 @@ end
 
 # Main execution
 
-square_file = 'Square 2.17.26.csv'
-shopify_file = 'Shopify 2.17.26x.csv'
-output_file = 'merged_shopify.20260217.csv'
+square_file = 'Square list 2.22.26.csv'
+shopify_file = 'Shopify list 2.22.26.csv'
+output_file = 'merged_shopify.20260222.csv'
 
 # square_file = 'Square 2_Charlie Wylie.csv'
 # shopify_file = 'Shopify 2_Charlie Wylie.csv'
