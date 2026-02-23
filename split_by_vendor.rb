@@ -1,76 +1,72 @@
 #!/usr/bin/env ruby
 
 require 'csv'
+require 'optparse'
+require 'fileutils'
 
-class NoMatches < StandardError; end
 
-class Splitter
-  attr_reader :file
-
-  def initialize(file)
+class FileSplitter
+  attr_reader :file, :prefix, :dir
+  def initialize(file, prefix:, directory:)
     @file = file
+    @prefix = prefix
+    @dir = directory
   end
 
   def call
-    vendors.each do |vendor|
-      vendor_data = extract_vendor_data(vendor)
-      write_vendor_file(vendor_data, vendor)
+    ensure_directory!
+    rows = load_file
+    rows.group_by { |row| row['Vendor'] }.each do |vendor, rows|
+      write_rows(vendor, rows)
     end
-  end
-
-  def extract_vendor_data(vendor)
-    data.filter { |row| row['Vendor'] == vendor }
-  end
-
-  def write_vendor_file(vdata, vendor)
-    fname = "20260222/#{generate_filename(vendor)}"
-    CSV.open(fname, 'w') do |csv|
-      headers = vdata.first.headers
-      csv << headers
-      vdata.each do |row|
-        csv << row
-      end
-    end
-    puts "Wrote #{vendor} data to #{fname}"
   end
 
   private
 
-  def data
-    @data ||= CSV.read(file, headers: true)
+  def load_file
+    CSV.read(file, headers: true).map(&:to_h)
   end
 
-  def vendors
-    @vendors ||= data.map do |row|
-      row['Vendor']
-    end.uniq
+  def write_rows(vendor, rows)
+    fname = generate_filename(vendor)
+    puts "Writing #{rows.count} rows to #{fname} ..."
+    CSV.open(fname, "w", write_headers: true, headers: rows.first.keys) do |csv|
+      rows.each { csv << _1 }
+    end
   end
 
   def generate_filename(vendor)
-    "merged-#{vendor.downcase.gsub(/\s+/, '-')}.csv"
+    File.join(dir, [
+      prefix,
+      vendor.gsub(/[[:punct:]]/, '-').gsub(/\s+/, '-').gsub(/--*/, '-').downcase + ".csv"
+    ].join("-"))
+  end
+
+  def ensure_directory!
+    FileUtils.mkdir_p(dir) unless dir.nil? || dir == ''
   end
 end
 
-# # Read the Shopify CSV file
-# csv_filename = $ARGV[0]
-# vendor_name = $ARGV[1]
-# new_file_name = csv_filename.split('.')[0] + '_' + vendor_name.split('.')[0] + '.csv'
-# rows = CSV.read(csv_filename, headers: true)
-# vendor_rows = []
-# vendor_name_matcher = vendor_name.to_s.strip.downcase
-# rows.each do |row|
-#   vendor_rows << row.to_h if row.to_s.strip.downcase.include? vendor_name_matcher
-# end
-# raise NoMatches, "Found no matches for #{vendor_name}" unless vendor_rows.count > 0
 
-# puts "Writing #{vendor_rows.count} rows to file #{new_file_name}"
-# CSV.open(new_file_name, 'w', headers: true) do |csv|
-#   csv << vendor_rows.first.keys
-#   vendor_rows.each do |row|
-#     csv << row
-#   end
-# end
+options = {}
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options]"
 
-puts "ARGS #{$ARGV[0]}"
+  opts.on("--prefix=PREFIX", "filenames prefix") do |prefix|
+    options[:prefix] = prefix
+  end
+  opts.on("--dir=DIR", "directory to put everythings") do |dir|
+    options[:dir] = dir
+  end
 
-Splitter.new($ARGV[0]).call
+  opts.on("-h", "--help", "Prints this help") do
+    puts opts
+    exit
+  end
+end
+
+parser.parse!
+file = ARGV[0]
+
+splitter = FileSplitter.new(file, prefix: options[:prefix], directory: options[:dir]).call
+
