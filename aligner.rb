@@ -586,9 +586,9 @@ end
 
 # Main execution
 
-square_file = 'Square list 2.22.26.csv'
-shopify_file = 'Shopify list 2.22.26.csv'
-output_file = 'merged_shopify.20260222.csv'
+square_file = 'Square list 2.28.26.csv'
+shopify_file = 'Shopify list 2.28.26.csv'
+output_file = 'merged_shopify.20260228.csv'
 
 # square_file = 'Square 2_Charlie Wylie.csv'
 # shopify_file = 'Shopify 2_Charlie Wylie.csv'
